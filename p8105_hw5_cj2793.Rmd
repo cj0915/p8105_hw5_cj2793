@@ -102,3 +102,93 @@ estimate_results |>
 ```
 
 The graph shows the average estimate of μ across all samples and only for samples where the null hypothesis was rejected. The average estimate of μ for rejected tests tends to be higher than the true value, especially for smaller effect sizes, because only larger estimates pass the significance value alpha = 0.05.
+
+# Problem 3
+
+## 0. Import raw data
+
+```{r message = FALSE}
+homicide_df = read_csv(file = "data/homicide.csv", na = c("Unknown", "NA", "")) |>
+  mutate(reported_date = as.Date(as.character(reported_date), format = "%Y%m%d"))
+```
+
+## 1. Describe the raw data
+
+```{r}
+summary(homicide_df)
+
+homicide_df <- homicide_df |>
+  mutate(city_state = str_c(city, state, sep = ", "))
+
+homicide_summary <- homicide_df |>
+  group_by(city) |>
+  summarize(
+    total_homicides = n(),
+    unsolved_homicides = sum(disposition %in% c("Closed without arrest", "Open/No arrest"),
+                             na.rm = TRUE)
+  )
+
+homicide_summary |> knitr::kable()
+
+```
+
+The raw data consists of information on homicides across `r nrow(homicide_summary)` large U.S. cities, with `r nrow(homicide_df)` records. The dataset contains variables such as `reported_date`, `victim_last`, `victim_first`, `victim_race`, `victim_age`, `victim_sex`, `city`, `state`, `lat`, `lon`, and `disposition`. The reported_date ranges from 2007-01-01 to 2015-11-05, and victim ages range from 0 to 102, with some missing values. The disposition variable indicates the status of each case, with categories like "Closed without arrest" and "Open/No arrest" representing unsolved homicides.
+
+## 2. `prop.test` for Baltimore, MD
+
+```{r}
+baltimore_data <- homicide_summary |> 
+  filter(city == "Baltimore")
+
+baltimore_prop_test <- prop.test(baltimore_data[['unsolved_homicides']],
+                                 baltimore_data[['total_homicides']]) |>
+  broom::tidy()
+
+baltimore_results <- baltimore_prop_test |> 
+  select(estimate, conf.low, conf.high)
+
+```
+
+## 3. `prop.test` for each of the cities
+
+### Define a function to estimate the proportion of unsolved homicides
+
+```{r}
+estimate_unsolved_proportion <- function(unsolved, total) {
+  prop_test_result <- prop.test(unsolved, total)
+  broom::tidy(prop_test_result) |> 
+    select(estimate, conf.low, conf.high)
+}
+```
+
+### Apply the function to all cities
+
+```{r}
+homicide_test_summary <- homicide_summary |>
+  mutate(
+    prop_test_result = map2(unsolved_homicides, total_homicides, 
+                            \(x, y) estimate_unsolved_proportion(x, y))
+  ) |>
+  unnest(prop_test_result)
+
+homicide_test_summary  |> knitr::kable()
+```
+
+```{r plot3}
+homicide_test_summary <- homicide_test_summary |>
+  arrange(desc(estimate))
+
+homicide_test_summary |> 
+  ggplot(aes(x = reorder(city, estimate), y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
+  coord_flip() +
+  labs(
+    title = "Proportion of Unsolved Homicides by City",
+    x = "City",
+    y = "Proportion of Unsolved Homicides"
+  ) +
+  theme_minimal()
+
+```
+
