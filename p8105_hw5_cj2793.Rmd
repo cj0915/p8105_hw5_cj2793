@@ -147,6 +147,7 @@ baltimore_prop_test <- prop.test(baltimore_data[['unsolved_homicides']],
 baltimore_results <- baltimore_prop_test |> 
   select(estimate, conf.low, conf.high)
 
+baltimore_results |> knitr::kable()
 ```
 
 ## 3. `prop.test` for each of the cities
