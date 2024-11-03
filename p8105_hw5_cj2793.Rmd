@@ -1,0 +1,104 @@
+---
+title: "p8105_hw5_cj2793"
+author: "Chenyu Jin"
+date: "2024-11-02"
+output: github_document
+---
+
+```{r message = FALSE}
+library(tidyverse)
+set.seed(1)
+```
+
+# Problem 2
+
+## Set design parameters according to the problem
+
+```{r}
+n <- 30
+sigma <- 5
+mu_values <- c(0:6)
+iterations <- 5000
+alpha <- 0.05
+```
+
+## Function to simulate data
+
+```{r}
+simulate_t_test <- function(mu, sigma = 5, n = 30) {
+  x <- rnorm(n, mean = mu, sd = sigma)
+  t_test_result <- t.test(x, mu = 0)
+  tibble(
+    estimate = t_test_result[["estimate"]],
+    p_value = t_test_result[["p.value"]]
+  )
+}
+```
+
+## Run simulation for each value of mu
+
+```{r}
+simulation_results <- expand_grid(mu = mu_values, 
+                                  iter = 1:iterations) |>
+  mutate(
+    result_df = map(mu, simulate_t_test)
+  ) |>
+  unnest(result_df)
+```
+
+## Calculate power for each mu value
+
+```{r}
+power_results <- simulation_results |>
+  group_by(mu) |>
+  summarize(power = mean(p_value < alpha))
+```
+
+## Plot power vs. true value of mu
+
+```{r plot1}
+power_results |>
+  ggplot(aes(x = mu, y = power)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Power of the One-Sample t-Test",
+    x = "True Value of μ",
+    y = "Power (Proportion of Null Rejected)"
+  ) +
+  theme_minimal()
+```
+
+The graph shows the relationship between the true value of μ and the power of the one-sample t-test. As the true value of μ increases, the power of the test also increases, indicating a higher probability of rejecting the null hypothesis when the effect size is larger.
+
+## Average estimate of mu across all samples and only when null is rejected
+
+```{r}
+estimate_results <- simulation_results |>
+  group_by(mu) |>
+  summarize(
+    avg_estimate_all = mean(estimate),
+    avg_estimate_rejected = mean(estimate[p_value < alpha])
+  )
+```
+
+## Plot average estimate vs. true value of mu
+
+```{r plot2}
+estimate_results |>
+  ggplot(aes(x = mu)) +
+  geom_line(aes(y = avg_estimate_all, color = "All Samples")) +
+  geom_line(aes(y = avg_estimate_rejected, color = "Null Rejected")) +
+  geom_point(aes(y = avg_estimate_all, color = "All Samples")) +
+  geom_point(aes(y = avg_estimate_rejected, color = "Null Rejected")) +
+  labs(
+    title = "Average Estimate of μ vs. True Value of μ",
+    x = "True Value of μ",
+    y = "Average Estimate of μ",
+    color = "Condition"
+  ) +
+  theme_minimal()
+
+```
+
+The graph shows the average estimate of μ across all samples and only for samples where the null hypothesis was rejected. The average estimate of μ for rejected tests tends to be higher than the true value, especially for smaller effect sizes, because only larger estimates pass the significance value alpha = 0.05.
