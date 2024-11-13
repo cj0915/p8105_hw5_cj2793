@@ -10,6 +10,50 @@ library(tidyverse)
 set.seed(1)
 ```
 
+# Problem 1
+
+## Function to simulate birthdays, check for duplicates, and estimate the probability of shared birthdays
+
+```{r}
+estimate_birthday_probabilities <- function(group_sizes, n_simulations) {
+  birthday_probabilities <- map_dbl(group_sizes, function(n) {
+    mean(replicate(n_simulations, {
+      birthdays <- sample(1:365, n, replace = TRUE)
+      any(duplicated(birthdays))
+    }))
+  })
+  
+  birthday_results <- tibble(
+    group_size = group_sizes,
+    probability = birthday_probabilities
+  )
+  
+  return(birthday_results)
+}
+```
+
+## Simulation and plot
+
+```{r problem 1 simulation plot}
+group_sizes <- 2:50
+n_simulations <- 10000
+
+birthday_results <- estimate_birthday_probabilities(group_sizes, n_simulations)
+
+birthday_results |> 
+  ggplot(aes(x = group_size, y = probability)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Probability of Shared Birthdays by Group Size",
+    x = "Group Size",
+    y = "Probability of Shared Birthday"
+  ) +
+  theme_minimal()
+```
+
+Initially, the probability of a shared birthday is very low for small group sizes. However, as the group size grows, the probability rises rapidly. By the time the group size reaches around 23, the probability exceeds 50%, and by group size 50, the probability approaches 100%.
+
 # Problem 2
 
 ## Set design parameters according to the problem
@@ -121,12 +165,13 @@ homicide_df <- homicide_df |>
   mutate(city_state = str_c(city, state, sep = ", "))
 
 homicide_summary <- homicide_df |>
-  group_by(city) |>
+  group_by(city_state) |>
   summarize(
     total_homicides = n(),
     unsolved_homicides = sum(disposition %in% c("Closed without arrest", "Open/No arrest"),
                              na.rm = TRUE)
-  )
+  ) |>
+  filter(city_state != "Tulsa, AL")
 
 homicide_summary |> knitr::kable()
 
@@ -138,7 +183,7 @@ The raw data consists of information on homicides across `r nrow(homicide_summar
 
 ```{r}
 baltimore_data <- homicide_summary |> 
-  filter(city == "Baltimore")
+  filter(city_state == "Baltimore, MD")
 
 baltimore_prop_test <- prop.test(baltimore_data[['unsolved_homicides']],
                                  baltimore_data[['total_homicides']]) |>
@@ -180,13 +225,13 @@ homicide_test_summary <- homicide_test_summary |>
   arrange(desc(estimate))
 
 homicide_test_summary |> 
-  ggplot(aes(x = reorder(city, estimate), y = estimate)) +
+  ggplot(aes(x = reorder(city_state, estimate), y = estimate)) +
   geom_point() +
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
   coord_flip() +
   labs(
     title = "Proportion of Unsolved Homicides by City",
-    x = "City",
+    x = "City, State",
     y = "Proportion of Unsolved Homicides"
   ) +
   theme_minimal()
