@@ -87,7 +87,8 @@ simulation_results <- expand_grid(mu = mu_values,
   mutate(
     result_df = map(mu, simulate_t_test)
   ) |>
-  unnest(result_df)
+  unnest(result_df) |>
+  mutate(indicator = as.numeric(p_value < 0.05))
 ```
 
 ## Calculate power for each mu value
@@ -145,7 +146,22 @@ estimate_results |>
 
 ```
 
-The graph shows the average estimate of μ across all samples and only for samples where the null hypothesis was rejected. The average estimate of μ for rejected tests tends to be higher than the true value, especially for smaller effect sizes, because only larger estimates pass the significance value alpha = 0.05.
+The graph shows the average estimate of μ across all samples and only for samples where the null hypothesis was rejected. The average estimate of μ for rejected tests tends to be higher than the true value for smaller effect sizes.
+
+```{r plot for explanation}
+simulation_results |>
+  ggplot(aes(x = estimate)) +
+  geom_histogram() +
+  facet_grid(mu ~ indicator) +
+    labs(
+    title = "Count of Estimated μ",
+    x = "Estimated μ",
+    y = "Count Number"
+  ) +
+  theme_minimal()
+```
+
+This plot shows why the average estimate of μ for rejected tests tends to be higher than the true value for smaller effect sizes. Some tests are rejected purely by chance. Consequently, the estimated average μ among the rejected tests is biased upwards, amplifying the difference between the true value and the observed mean, particularly when the effect size is small.
 
 # Problem 3
 
@@ -177,7 +193,7 @@ homicide_summary |> knitr::kable()
 
 ```
 
-The raw data consists of information on homicides across `r nrow(homicide_summary)` large U.S. cities, with `r nrow(homicide_df)` records. The dataset contains variables such as `reported_date`, `victim_last`, `victim_first`, `victim_race`, `victim_age`, `victim_sex`, `city`, `state`, `lat`, `lon`, and `disposition`. The reported_date ranges from 2007-01-01 to 2015-11-05, and victim ages range from 0 to 102, with some missing values. The disposition variable indicates the status of each case, with categories like "Closed without arrest" and "Open/No arrest" representing unsolved homicides.
+The raw data consists of information on homicides across `r nrow(homicide_summary)` large U.S. cities, with `r nrow(homicide_df)` records. The dataset contains variables such as `reported_date`, `victim_last`, `victim_first`, `victim_race`, `victim_age`, `victim_sex`, `city`, `state`, `lat`, `lon`, and `disposition`. The reported_date ranges from 2007-01-01 to 2015-11-05, and victim ages range from 0 to 102, with some missing values. The disposition variable indicates the status of each case, with categories like "Closed without arrest" and "Open/No arrest" representing unsolved homicides. Tulsa, AL is deleted because of the data entry error.
 
 ## 2. `prop.test` for Baltimore, MD
 
@@ -189,8 +205,7 @@ baltimore_prop_test <- prop.test(baltimore_data[['unsolved_homicides']],
                                  baltimore_data[['total_homicides']]) |>
   broom::tidy()
 
-baltimore_results <- baltimore_prop_test |> 
-  select(estimate, conf.low, conf.high)
+baltimore_results <- baltimore_prop_test
 
 baltimore_results |> knitr::kable()
 ```
@@ -221,20 +236,17 @@ homicide_test_summary  |> knitr::kable()
 ```
 
 ```{r plot3}
-homicide_test_summary <- homicide_test_summary |>
-  arrange(desc(estimate))
-
-homicide_test_summary |> 
-  ggplot(aes(x = reorder(city_state, estimate), y = estimate)) +
+homicide_test_summary |>
+  mutate(city_state = fct_reorder(city_state, estimate)) |>
+  ggplot(aes(x = city_state, y = estimate)) +
   geom_point() +
-  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
-  coord_flip() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) +
   labs(
     title = "Proportion of Unsolved Homicides by City",
     x = "City, State",
     y = "Proportion of Unsolved Homicides"
   ) +
-  theme_minimal()
-
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
+Richmond, VA has the lowest proportion of unsolved homicides, while Chicago, IL has the highest. The spread of the confidence intervals indicates varying uncertainty levels, with cities like San Francisco, CA showing relatively wide confidence intervals, suggesting more uncertainty in their estimates.
